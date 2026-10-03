@@ -1,0 +1,102 @@
+<div class="shell">
+  <header class="head">
+    <h1>Tube</h1>
+    <p class="sub">Paste a link from Rutube, YouTube or Vimeo</p>
+  </header>
+
+  <form class="entry" (submit)="$event.preventDefault(); submit()" novalidate>
+    <input
+      class="url"
+      type="url"
+      name="url"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="https://rutube.ru/video/..."
+      [ngModel]="url()"
+      (ngModelChange)="url.set($event)"
+    />
+    <button type="button" class="ghost" [disabled]="!url().trim() || probing()" (click)="inspect()">
+      {{ probing() ? 'Checking…' : 'Qualities' }}
+    </button>
+    <button type="submit" class="primary" [disabled]="!canSubmit()">
+      {{ submitting() ? 'Starting…' : 'Download' }}
+    </button>
+  </form>
+
+  @if (error(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  }
+
+  @if (video(); as info) {
+    <section class="preview">
+      <div class="meta">
+        <h2>{{ info.title }}</h2>
+        <p class="facts">
+          @if (info.uploader) {
+            <span>{{ info.uploader }}</span>
+          }
+          @if (info.duration) {
+            <span>{{ (info.duration / 60) | number: '1.0-0' }} min</span>
+          }
+          <span>{{ formats().length }} qualities</span>
+        </p>
+      </div>
+      <label class="picker">
+        <span>Quality</span>
+        <select [ngModel]="formatId()" (ngModelChange)="formatId.set($event)">
+          <option [ngValue]="null">Best available</option>
+          @for (format of formats(); track trackFormat($index, format)) {
+            <option [ngValue]="format.format_id">{{ formatLabel(format) }}</option>
+          }
+        </select>
+      </label>
+    </section>
+  }
+
+  @if (tasks().length === 0) {
+    <p class="empty">No downloads yet.</p>
+  }
+
+  <ul class="tasks">
+    @for (task of tasks(); track trackTask($index, task)) {
+      <li class="task" [class.failed]="task.status === 'error'" [class.done]="task.status === 'completed'">
+        <div class="row">
+          <div class="id">
+            <a class="title" [href]="task.url" target="_blank" rel="noopener">{{ task.title ?? task.url }}</a>
+            <span class="state">{{ statusLabel(task) }}</span>
+          </div>
+          <div class="nums">
+            @if (task.status === 'downloading') {
+              <span class="pct">{{ task.percent | number: '1.1-1' }}%</span>
+            }
+            <button type="button" class="x" title="Remove from list" (click)="remove(task.id)">×</button>
+          </div>
+        </div>
+
+        @if (task.status === 'downloading' || task.status === 'completed') {
+          <div class="track" [attr.aria-valuenow]="task.percent" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+            <div class="fill" [style.width.%]="task.percent"></div>
+          </div>
+          <div class="stats">
+            <span>{{ task.downloaded_human }} @if (task.total_human) { of {{ task.total_human }} }</span>
+            @if (task.speed_human) {
+              <span>{{ task.speed_human }}</span>
+            }
+            @if (etaLabel(task); as eta) {
+              <span>{{ eta }}</span>
+            }
+          </div>
+        }
+
+        @if (task.status === 'error') {
+          <p class="problem">{{ task.error }}</p>
+          <button type="button" class="ghost small" (click)="retry(task)">Try again</button>
+        }
+
+        @if (task.status === 'completed' && task.file_url) {
+          <a class="save" [href]="task.file_url" [download]="task.filename">Download {{ task.filename }}</a>
+        }
+      </li>
+    }
+  </ul>
+</div>
